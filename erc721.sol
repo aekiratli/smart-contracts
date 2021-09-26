@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
     // File: @openzeppelin/contracts/GSN/Context.sol
 
     pragma solidity >=0.6.0 <0.8.0;
@@ -1793,53 +1795,39 @@
 
 
 
-    contract NftMarketplace is ERC721, Ownable {
+    contract ArtToken is ERC721, Ownable {
         using Counters for Counters.Counter;
 
         // Used for generating the tokenId of new NFT minted
         Counters.Counter private _tokenIds;
 
-        // Map the artId for each tokenId
-        mapping(uint256 => uint8) private artIds;
-
         // Map the artName for a tokenId
-        mapping(uint8 => string) private artNames;
-
-        // Map the artPrice for each tokenId
+        mapping(uint256 => string) private artNames;
+        
+        // Map the artCreator for a tokenId
+        mapping(uint256 => address payable) private artCreator;
+        
+        // Map the artPrice for a tokenId
         mapping(uint256 => uint256) private artPrice;
 
-        struct Art {
-            address creator;
-            address owner;
-            uint256 price;
-            uint256 uploadDate;
-         }
-
-        mapping(uint256 => Art) arts;
-
-    receive() payable external {
-        mint();
-    }
 
         // Dev Address
-        address public devAddress;
+        address payable public devAddress;
+        address public marketPlaceAddress;
 
-        constructor(string memory _baseURI, address _devAdress) public ERC721("Art Token", "AT") {
+
+        constructor(string memory _baseURI, address payable _devAdress, address _marketPlaceAddress) public ERC721("Art Token", "AT") {
             _setBaseURI(_baseURI);
             devAddress = _devAdress;
+            marketPlaceAddress = _marketPlaceAddress;
+
         }
 
-        /**
-        * @dev Get artId for a specific tokenId.
-        */
-        function getArtId(uint256 _tokenId) external view returns (uint8) {
-            return artIds[_tokenId];
-        }
 
         /**
         * @dev Update dev address.
         */
-        function setDevAddress(address _devAddress) public{
+        function setDevAddress(address payable _devAddress) public{
             require(msg.sender == devAddress, "setDevAddress: FORBIDDEN");
             devAddress = _devAddress;
         }
@@ -1847,58 +1835,49 @@
         /**
         * @dev Get the associated artName for a specific artId.
         */
-        function getArtName(uint8 _artId)
+        function getArtDetails(uint256 _tokenId)
             external
             view
-            returns (string memory)
+            returns (string memory, uint256, address)
         {
-            return artNames[_artId];
+            return (artNames[_tokenId], artPrice[_tokenId], artCreator[_tokenId]);
         }
 
-        /**
-        * @dev Get the associated artName for a unique tokenId.
-        */
-        function getArtNameOfTokenId(uint256 _tokenId)
-            external
-            view
-            returns (string memory)
-        {
-            uint8 artId = artIds[_tokenId];
-            return artNames[artId];
-        }
 
         /**
         * @dev Mint NFTs. Only the owner can call it.
         */
-        function public payable mint(
-            address _to,
-            uint8 _artId
-        ) returns (uint256) {
+        function uploadToMarketPlace(
+            uint256  _price,
+            string memory  _name
 
+        ) public payable returns (uint256) {
+            require(msg.value == 0.01 ether, "uploadToMarketPlace: Fee must be 0.01");
 
-
-
+            devAddress.transfer(address(this).balance);
+            
             uint256 newId = _tokenIds.current();
+            
+            artNames[newId] = _name;
+            artPrice[newId] = _price;
+            artCreator[newId] = msg.sender;
+
+
+
             _tokenIds.increment();
-            artIds[newId] = _artId;
-            _mint(_to, newId);
-            return newId;       
+            _mint(marketPlaceAddress, newId);
+            return newId;
+        }
+        
+        function buyFromMarketPlace(
+            uint256  _tokenId
+        ) public payable returns (uint256) {
+            require(msg.value == artPrice[_tokenId], "buyFromMarketPlace: Pay amount must be same as price");
+           // ArtToken.transferFrom(msg.sender,msg.sender,_tokenId)
+            artCreator[_tokenId].transfer(address(this).balance/2);
+            devAddress.transfer(address(this).balance/2);
+
+            return _tokenId;
         }
 
-        /**
-        * @dev Set a unique name for each artId. It is supposed to be called once.
-        */
-        function setArtName(uint8 _artId, string calldata _name)
-            external
-            onlyOwner
-        {
-            artNames[_artId] = _name;
-        }
-
-        /**
-        * @dev Burn a NFT token. Callable by owner only.
-        */
-        function burn(uint256 _tokenId) external onlyOwner {
-            _burn(_tokenId);
-        }
     }
