@@ -1838,10 +1838,11 @@
         function getArtDetails(uint256 _tokenId)
             external
             view
-            returns (string memory, uint256, address)
+            returns (string memory, uint256, address payable)
         {
             return (artNames[_tokenId], artPrice[_tokenId], artCreator[_tokenId]);
         }
+    
 
 
         /**
@@ -1853,31 +1854,61 @@
 
         ) public payable returns (uint256) {
             require(msg.value == 0.01 ether, "uploadToMarketPlace: Fee must be 0.01");
-
             devAddress.transfer(address(this).balance);
-            
             uint256 newId = _tokenIds.current();
-            
             artNames[newId] = _name;
             artPrice[newId] = _price;
             artCreator[newId] = msg.sender;
-
-
-
             _tokenIds.increment();
             _mint(marketPlaceAddress, newId);
             return newId;
         }
-        
+
+        function updateArtPrice(uint256 _tokenId, uint256 _price)
+            external
+        {
+            require(msg.sender == marketPlaceAddress, "updateArtPrice: Pay amount must be same as price");
+            artPrice[_tokenId] = _price;
+        }
+    }
+    
+    contract MarketPlace is Ownable {
+
+        using SafeMath for uint256;
+        ArtToken public artToken;
+        address payable public devAddress;
+        constructor(
+            ArtToken _artToken,
+            address payable _devAddress
+         ) public {
+         artToken = _artToken;
+         devAddress = _devAddress;
+         }
+
         function buyFromMarketPlace(
             uint256  _tokenId
         ) public payable returns (uint256) {
-            require(msg.value == artPrice[_tokenId], "buyFromMarketPlace: Pay amount must be same as price");
-           // ArtToken.transferFrom(msg.sender,msg.sender,_tokenId)
-            artCreator[_tokenId].transfer(address(this).balance/2);
-            devAddress.transfer(address(this).balance/2);
+            (string memory name, uint256 price, address payable creator) = artToken.getArtDetails(_tokenId);
+            require(msg.value == price, "buyFromMarketPlace: Pay amount must be same as price");
+
+            creator.transfer(address(this).balance.div(2));
+            devAddress.transfer(address(this).balance);
+            artToken.transferFrom(address(this), msg.sender, _tokenId);
 
             return _tokenId;
         }
 
+        function sellToMarketPlace(
+            uint256  _tokenId,
+            uint256 _price
+        ) public payable returns (uint256) {
+            (string memory name, uint256 price, address payable creator) = artToken.getArtDetails(_tokenId);
+            require(msg.sender == artToken.ownerOf(_tokenId), "sellToMarketPlace: Pay amount must be same as price");
+            artToken.updateArtPrice(_tokenId, _price);
+            creator.transfer(address(this).balance.div(2));
+            devAddress.transfer(address(this).balance);
+            artToken.transferFrom(msg.sender, address(this), _tokenId);
+
+            return _tokenId;
+        }
     }
