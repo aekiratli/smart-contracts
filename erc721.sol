@@ -1810,19 +1810,21 @@
         // Map the artPrice for a tokenId
         mapping(uint256 => uint256) private artPrice;
 
+        // Map the artSeller for a tokenId
+        mapping(uint256 =>  address payable) private artSeller;
 
         // Dev Address
         address payable public devAddress;
+        // MarketPlace Address
         address public marketPlaceAddress;
+        // Minting fee for dev address
+        uint256 public mintFee;
 
 
         constructor(string memory _baseURI, address payable _devAdress, address _marketPlaceAddress) public ERC721("Art Token", "AT") {
             _setBaseURI(_baseURI);
             devAddress = _devAdress;
-            marketPlaceAddress = _marketPlaceAddress;
-
         }
-
 
         /**
         * @dev Update dev address.
@@ -1831,44 +1833,69 @@
             require(msg.sender == devAddress, "setDevAddress: FORBIDDEN");
             devAddress = _devAddress;
         }
+        /**
+        * @dev Update marketplace address.
+        */
+        function setMarketPlaceAddress(address _marketPlaceAddress) public onlyOwner {
+            marketPlaceAddress = _marketPlaceAddress;
+        }
 
         /**
-        * @dev Get the associated artName for a specific artId.
+        * @dev Get the details for a specific artId.
         */
         function getArtDetails(uint256 _tokenId)
             external
             view
-            returns (string memory, uint256, address payable)
+            returns (string memory, uint256, address payable, address payable)
         {
-            return (artNames[_tokenId], artPrice[_tokenId], artCreator[_tokenId]);
+            return (artNames[_tokenId], artPrice[_tokenId], artCreator[_tokenId], artSeller[_tokenId]);
         }
     
-
-
         /**
-        * @dev Mint NFTs. Only the owner can call it.
+        * @dev Upload NFTs to Marketplace.
         */
         function uploadToMarketPlace(
             uint256  _price,
             string memory  _name
 
         ) public payable returns (uint256) {
-            require(msg.value == 0.01 ether, "uploadToMarketPlace: Fee must be 0.01");
+            require(msg.value == mintFee, "uploadToMarketPlace: Fee must be mintFee");
             devAddress.transfer(address(this).balance);
             uint256 newId = _tokenIds.current();
             artNames[newId] = _name;
             artPrice[newId] = _price;
             artCreator[newId] = msg.sender;
+            artSeller[newId] = msg.sender;
             _tokenIds.increment();
             _mint(marketPlaceAddress, newId);
             return newId;
         }
 
+        /**
+        * @dev Update price of Art.
+        */
         function updateArtPrice(uint256 _tokenId, uint256 _price)
             external
         {
-            require(msg.sender == marketPlaceAddress, "updateArtPrice: Pay amount must be same as price");
+            require(msg.sender == marketPlaceAddress, "updateArtPrice: Call not from marketPlace");
             artPrice[_tokenId] = _price;
+        }
+
+        /**
+        * @dev Update seller of Art.
+        */
+        function updateSellerAddress(uint256 _tokenId, address payable _seller)
+            external
+        {
+            require(msg.sender == marketPlaceAddress, "updateArtPrice: Call not from marketPlace");
+            artSeller[_tokenId] = _seller;
+        }
+
+        /**
+        * @dev Update minting fee.
+        */
+        function updateMintingFee(uint256 _mintFee) public onlyOwner {
+            mintFee = _mintFee;
         }
     }
     
@@ -1877,6 +1904,9 @@
         using SafeMath for uint256;
         ArtToken public artToken;
         address payable public devAddress;
+        uint256 devFee;
+        uint256 creatorFee;
+
         constructor(
             ArtToken _artToken,
             address payable _devAddress
@@ -1885,30 +1915,60 @@
          devAddress = _devAddress;
          }
 
+        /**
+        * @dev Buy from marketplace.
+        */
         function buyFromMarketPlace(
             uint256  _tokenId
         ) public payable returns (uint256) {
-            (string memory name, uint256 price, address payable creator) = artToken.getArtDetails(_tokenId);
+            (string memory name, uint256 price, address payable creator, address payable seller) = artToken.getArtDetails(_tokenId);
             require(msg.value == price, "buyFromMarketPlace: Pay amount must be same as price");
-
-            creator.transfer(address(this).balance.div(2));
+            seller.transfer(address(this).balance.sub(devFee + creatorFee));
+            creator.transfer(address(this).balance.sub(devFee));
             devAddress.transfer(address(this).balance);
             artToken.transferFrom(address(this), msg.sender, _tokenId);
-
             return _tokenId;
         }
-
+        /**
+        * @dev Sell to MarketPlace.
+        */
         function sellToMarketPlace(
             uint256  _tokenId,
             uint256 _price
         ) public payable returns (uint256) {
             (string memory name, uint256 price, address payable creator) = artToken.getArtDetails(_tokenId);
-            require(msg.sender == artToken.ownerOf(_tokenId), "sellToMarketPlace: Pay amount must be same as price");
+            require(msg.sender == artToken.ownerOf(_tokenId), "sellToMarketPlace: Caller is not the owner of the token");
+            require(msg.value == sellFee, "sellToMarketPlace: Pay must be equal to sellFee");
             artToken.updateArtPrice(_tokenId, _price);
-            creator.transfer(address(this).balance.div(2));
+            artToken.updateSellerAddress(_tokenId, msg.sender);
             devAddress.transfer(address(this).balance);
             artToken.transferFrom(msg.sender, address(this), _tokenId);
 
             return _tokenId;
+        }
+        /**
+        * @dev Update marketplace address.
+        */
+        function setMarketPlaceAddress(address _marketPlaceAddress) public onlyOwner {
+            artToken.setMarketPlaceAddress(_marketPlaceAddress);
+        }
+        /**
+        * @dev Update dev address.
+        */
+        function setDevAddress(address payable _devAddress) public onlyOwner {
+            artToken.setDevAddress(_devAddress);
+        }
+        /**
+        * @dev Update devFee.
+        */
+        function updateDevFee(uint256 _devFee) public onlyOwner {
+            devFee = _devFee;
+        }
+        /**
+        * @dev Update mintFee.
+        */
+        function updateMintingFee(uint256 _mintFee) public onlyOwner {
+            artToken.updateMintingFee(_mintFee);
+
         }
     }
