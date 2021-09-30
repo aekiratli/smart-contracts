@@ -1711,7 +1711,7 @@
             _approve(address(0), tokenId);
 
             _holderTokens[from].remove(tokenId);
-            _holderTokens[to].add(tokenId);
+            _holderTokens[to](tokenId);
 
             _tokenOwners.set(tokenId, to);
 
@@ -1820,10 +1820,29 @@
         // Minting fee for dev address
         uint256 public mintFee;
 
+        // WOW
+         uint256 public reflectionBalance;
+         uint256 public totalDividend;
+         uint8 holderPercantage;
+         uint8 devPercantage;
+         uint8 creatorPercantage;
+         mapping (uint256 => uint256) public lastDividendAt;
 
-        constructor(string memory _baseURI, address payable _devAdress, address _marketPlaceAddress) public ERC721("Art Token", "AT") {
-            _setBaseURI(_baseURI);
-            devAddress = _devAdress;
+         mapping (address => mapping (uint256 => bool)) public canCancel;
+
+
+
+        constructor(string memory _baseURI,
+            address payable _devAdress,
+            address _marketPlaceAddress,
+            uint8 _holderPercantage,
+            uint8 _creatorPercantage,
+            uint8 _devPercantage) public ERC721("Art Token", "AT") {
+                _setBaseURI(_baseURI);
+                devAddress = _devAdress;
+                holderPercantage = _holderPercantage;
+                devPercantage = _devPercantage;
+                creatorPercantage = _creatorPercantage;
         }
 
         /**
@@ -1859,7 +1878,7 @@
             string memory  _name
 
         ) public payable returns (uint256) {
-            require(msg.value == mintFee, "uploadToMarketPlace: Fee must be mintFee");
+            require(msg.value == _price.div(devFee).add(_price.div(holderPercantage)), "uploadToMarketPlace: Price does not sum up");
             devAddress.transfer(address(this).balance);
             uint256 newId = _tokenIds.current();
             artNames[newId] = _name;
@@ -1868,6 +1887,7 @@
             artSeller[newId] = msg.sender;
             _tokenIds.increment();
             _mint(marketPlaceAddress, newId);
+            splitBalance(_price,false);
             return newId;
         }
 
@@ -1875,7 +1895,7 @@
         * @dev Update price of Art.
         */
         function updateArtPrice(uint256 _tokenId, uint256 _price)
-            external
+            private
         {
             require(msg.sender == marketPlaceAddress, "updateArtPrice: Call not from marketPlace");
             artPrice[_tokenId] = _price;
@@ -1885,7 +1905,7 @@
         * @dev Update seller of Art.
         */
         function updateSellerAddress(uint256 _tokenId, address payable _seller)
-            external
+            private
         {
             require(msg.sender == marketPlaceAddress, "updateArtPrice: Call not from marketPlace");
             artSeller[_tokenId] = _seller;
@@ -1897,7 +1917,25 @@
         function updateMintingFee(uint256 _mintFee) public onlyOwner {
             mintFee = _mintFee;
         }
-    }
+
+        function splitBalance(uint256 price, bool isUsed, address payable creator) private {
+            if (isUsed)
+            {
+                uint256 creatorFee  = price.div(creatorPercantage); 
+                creator.transfer(creatorFee);
+            }
+
+            uint256 holderShare = price.div(holderPercantage);
+            uint256 devFee  = price.div(devPercantage);
+            devAddress.transfer(devFee);
+            reflectDividend(holderShare);
+        }
+
+        function reflectDividend(uint256 amount) private {
+            reflectionBalance  = reflectionBalance + amount;
+            totalDividend = totalDividend + (amount/totalSupply());
+        }
+            }
     
     contract MarketPlace is Ownable {
 
@@ -1923,10 +1961,8 @@
         ) public payable returns (uint256) {
             (string memory name, uint256 price, address payable creator, address payable seller) = artToken.getArtDetails(_tokenId);
             require(msg.value == price, "buyFromMarketPlace: Pay amount must be same as price");
-            seller.transfer(address(this).balance.sub(devFee + creatorFee));
-            creator.transfer(address(this).balance.sub(devFee));
-            devAddress.transfer(address(this).balance);
             artToken.transferFrom(address(this), msg.sender, _tokenId);
+            artToken.splitBalance(msg.value,true,creator);
             return _tokenId;
         }
         /**
@@ -1938,12 +1974,9 @@
         ) public payable returns (uint256) {
             (string memory name, uint256 price, address payable creator) = artToken.getArtDetails(_tokenId);
             require(msg.sender == artToken.ownerOf(_tokenId), "sellToMarketPlace: Caller is not the owner of the token");
-            require(msg.value == sellFee, "sellToMarketPlace: Pay must be equal to sellFee");
             artToken.updateArtPrice(_tokenId, _price);
             artToken.updateSellerAddress(_tokenId, msg.sender);
-            devAddress.transfer(address(this).balance);
             artToken.transferFrom(msg.sender, address(this), _tokenId);
-
             return _tokenId;
         }
         /**
