@@ -1818,9 +1818,9 @@ contract ArtToken is ERC721, Ownable {
 
     uint256 public reflectionBalance;
     uint256 public totalDividend;
-    uint8 holderPercantage;
-    uint8 devPercantage;
-    uint8 creatorPercantage;
+    uint8 public holderPercantage;
+    uint8 public devPercantage;
+    uint8 public creatorPercantage;
     mapping(uint256 => uint256) public lastDividendAt;
 
 
@@ -1848,8 +1848,8 @@ contract ArtToken is ERC721, Ownable {
         returns (
             string memory,
             uint256,
-            address,
-            address 
+            address payable,
+            address payable
         )
     {
         return (
@@ -1878,7 +1878,7 @@ contract ArtToken is ERC721, Ownable {
         artCreator[newId] = msg.sender;
         artSeller[newId] = msg.sender;
         _tokenIds.increment();
-        _mint(address(this), newId);
+        _mint(marketPlaceAddress, newId);
         splitBalance(_price, false, address(0), address(0));
         return newId;
     }
@@ -1886,7 +1886,7 @@ contract ArtToken is ERC721, Ownable {
     /**
      * @dev Update price of Art.
      */
-    function updateArtPrice(uint256 _tokenId, uint256 _price) private {
+    function updateArtPrice(uint256 _tokenId, uint256 _price) public {
         require(
             msg.sender == marketPlaceAddress,
             "updateArtPrice: Call not from marketPlace"
@@ -1898,7 +1898,7 @@ contract ArtToken is ERC721, Ownable {
      * @dev Update seller of Art.
      */
     function updateSellerAddress(uint256 _tokenId, address payable _seller)
-        private
+        public
     {
         require(
             msg.sender == marketPlaceAddress,
@@ -1907,13 +1907,20 @@ contract ArtToken is ERC721, Ownable {
         artSeller[_tokenId] = _seller;
     }
 
+            /**
+        * @dev Update marketplace address.
+        */
+        function setMarketPlaceAddress(address _marketPlaceAddress) public onlyOwner {
+            marketPlaceAddress = _marketPlaceAddress;
+        }
+
+
     function splitBalance(
         uint256 price,
         bool isBought,
         address payable creator,
         address payable seller
     ) private {
-
         uint256 holderShare = price.div(holderPercantage);
         uint256 devShare = price.div(devPercantage);
 
@@ -1932,42 +1939,93 @@ contract ArtToken is ERC721, Ownable {
         totalDividend = totalDividend + (price / totalSupply());
     }
 
-    /**
-     * @dev Buy from marketplace.
-     */
-    function buyFromMarketPlace(uint256 _tokenId)
-        public
-        payable
-        returns (uint256)
-    {
-        require(
-            msg.value == artPrice[_tokenId],
-            "buyFromMarketPlace: Pay amount must be same as price"
-        );
-        approve(address(this),_tokenId);
-        transferFrom(address(this), msg.sender, _tokenId);
-        splitBalance(msg.value, true, artCreator[_tokenId], artSeller[_tokenId]);
-        return _tokenId;
-    }
+     function reflectDividendForMarketPlace(uint256 price) public {
+        require(msg.sender == marketPlaceAddress, "reflectDividendForMarketPlace: Pay amount must be same as price");
 
-    /**
-     * @dev Sell to MarketPlace.
-     */
-    function sellToMarketPlace(uint256 _tokenId, uint256 _price)
-        public
-        payable
-        returns (uint256)
-    {
-        require(
-            msg.sender == ownerOf(_tokenId),
-            "sellToMarketPlace: Caller is not the owner of the token"
-        );
-        updateArtPrice(_tokenId, _price);
-        updateSellerAddress(_tokenId, msg.sender);
-        transferFrom(msg.sender, address(this), _tokenId);
-        return _tokenId;
-    }
+        reflectionBalance = reflectionBalance + price;
+        totalDividend = totalDividend + (price / totalSupply());
+    }   
+
 }
 
+// Marketplace
+
+   contract MarketPlace is Ownable {
+
+        using SafeMath for uint256;
+        ArtToken public artToken;
+        address payable public devAddress;
+        uint256 devFee;
+        uint256 creatorFee;
+
+        constructor(
+            ArtToken _artToken,
+            address payable _devAddress
+         ) public {
+         artToken = _artToken;
+         devAddress = _devAddress;
+         }
+
+        /**
+        * @dev Buy from marketplace.
+        */
+        function buyFromMarketPlace(
+            uint256  _tokenId
+        ) public payable returns (uint256) {
+            (string memory name, uint256 price, address payable creator, address payable seller) = artToken.getArtDetails(_tokenId);
+            require(msg.value == price, "buyFromMarketPlace: Pay amount must be same as price");
+            artToken.transferFrom(address(this), msg.sender, _tokenId);
+            splitBalance(msg.value, true, creator, seller);
+            return _tokenId;
+        
+        }
+        /**
+        * @dev Sell to MarketPlace.
+        */
+        function sellToMarketPlace(
+            uint256  _tokenId,
+            uint256 _price
+        ) public payable returns (uint256) {
+            (string memory name, uint256 price, address payable creator, address payable seller) = artToken.getArtDetails(_tokenId);
+            require(msg.sender == artToken.ownerOf(_tokenId), "sellToMarketPlace: Caller is not the owner of the token");
+            artToken.updateArtPrice(_tokenId, _price);
+            artToken.updateSellerAddress(_tokenId, msg.sender);
+            artToken.transferFrom(msg.sender, address(this), _tokenId);
+            return _tokenId;
+        }
+
+        /**
+        * @dev Sell to MarketPlace.
+        */
+
+        function cancelSell(
+            uint256  _tokenId
+        ) public payable returns (uint256) {
+            (string memory name, uint256 price, address payable creator, address payable seller) = artToken.getArtDetails(_tokenId);
+            require(msg.sender == seller, "cancelSell: Caller is not the owner of the token");
+            artToken.transferFrom(address(this), msg.sender, _tokenId);
+            return _tokenId;
+        }
+
+    function splitBalance(
+        uint256 price,
+        bool isBought,
+        address payable creator,
+        address payable seller
+    ) private {
+        uint256 holderShare = price.div(artToken.holderPercantage());
+        uint256 devShare = price.div(artToken.devPercantage());
+
+        if (isBought) {
+            uint256 creatorShare = price.div(artToken.creatorPercantage());
+            uint256 sellerShare = price.sub(creatorShare + devShare + holderShare);
+            creator.transfer(creatorShare);
+            seller.transfer(sellerShare);
+        }
+        devAddress.transfer(devShare);
+        artToken.reflectDividendForMarketPlace(holderShare);
+    }
+    
+    } 
 
 
