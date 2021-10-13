@@ -9,8 +9,11 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 
 /**
+ * ULAN INIT MINT VE SHARE !
  * @dev {ERC721} token, including:
  *
  *  - ability for holders to burn (destroy) their tokens
@@ -24,7 +27,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * roles, as well as the default admin role, which will let it grant both minter
  * and pauser roles to other accounts.
  */
-contract CryptoWhales is Context,  AccessControlEnumerable, ERC721Enumerable, ERC721URIStorage{
+contract CryptoWhales is Context,  Ownable , AccessControlEnumerable, ERC721Enumerable, ERC721URIStorage{
   using Counters for Counters.Counter;
   Counters.Counter public _tokenIdTracker;
   string private _baseTokenURI;
@@ -84,7 +87,7 @@ contract CryptoWhales is Context,  AccessControlEnumerable, ERC721Enumerable, ER
 
   function initAdminMint(uint amount) public payable {
     require(msg.sender == _admin || msg.sender == _admin2, "CryptoWhales: Only admin can call");
-    require(_tokenIdTracker.current() <= 2, "CryptoWhales: not enough crypto whales left to mint amount");
+    require(_tokenIdTracker.current() + amount <= 2, "CryptoWhales: not enough crypto whales left to mint amount");
 
     for(uint i=0; i < amount; i++){
       _mint(msg.sender, _tokenIdTracker.current());
