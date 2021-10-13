@@ -73,7 +73,7 @@ contract CryptoWhales is Context,  AccessControlEnumerable, ERC721Enumerable, ER
   function mint(uint amount) public payable {
     require(msg.value == _price*amount, "CryptoWhales: must send correct price");
     require(_tokenIdTracker.current() + amount <= _max, "CryptoWhales: not enough crypto whales left to mint amount");
-    require(_startDate >= block.timestamp,"CryptoWhales: Sale is not active");
+    require(_startDate <= block.timestamp,"CryptoWhales: Sale is not active");
     for(uint i=0; i < amount; i++){
       _mint(msg.sender, _tokenIdTracker.current());
       minter[_tokenIdTracker.current()] = msg.sender;
@@ -84,7 +84,7 @@ contract CryptoWhales is Context,  AccessControlEnumerable, ERC721Enumerable, ER
 
   function initAdminMint(uint amount) public payable {
     require(msg.sender == _admin || msg.sender == _admin2, "CryptoWhales: Only admin can call");
-    require(_tokenIdTracker.current() <= 2, "CryptoWhales: Can't have more than 2");
+    require(_tokenIdTracker.current() <= 2, "CryptoWhales: not enough crypto whales left to mint amount");
 
     for(uint i=0; i < amount; i++){
       _mint(msg.sender, _tokenIdTracker.current());
@@ -114,8 +114,8 @@ contract CryptoWhales is Context,  AccessControlEnumerable, ERC721Enumerable, ER
 
   function splitBalance(uint256 amount) private {
 
-      uint256 mintingShare1  = (amount)/2;
-      uint256 mintingShare2  = (amount)/2;
+      uint256 mintingShare1  = (amount)*3/4;
+      uint256 mintingShare2  = (amount)/4;
       payable(_admin).transfer(mintingShare1);
       payable(_admin2).transfer(mintingShare2);
   }
