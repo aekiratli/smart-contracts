@@ -117,10 +117,8 @@ contract CryptoWhales is Context,  Ownable , AccessControlEnumerable, ERC721Enum
 
   function splitBalance(uint256 amount) private {
 
-      uint256 mintingShare1  = (amount)*3/4;
-      uint256 mintingShare2  = (amount)/4;
+      uint256 mintingShare1  = amount;
       payable(_admin).transfer(mintingShare1);
-      payable(_admin2).transfer(mintingShare2);
   }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override(ERC721, ERC721Enumerable) {
