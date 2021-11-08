@@ -36,7 +36,7 @@ contract CryptoWhales is Context,  Ownable , AccessControlEnumerable, ERC721Enum
   uint private _max;
   address private _admin;
   address private _admin2;
-
+  mapping(address => bool) public whitelist;
   mapping (uint256 => address ) public minter;
 
   constructor(string memory name, string memory symbol, string memory baseTokenURI, uint256 mintPrice, uint256 startDate ,uint max, address admin, address admin2) ERC721(name, symbol) {
@@ -85,9 +85,31 @@ contract CryptoWhales is Context,  Ownable , AccessControlEnumerable, ERC721Enum
     }
   }
 
-  function initAdminMint(uint amount) public payable {
+
+  function whitelistAddresses(address[] memory _addresses) public onlyOwner
+  {
+        for (uint i=0; i<_addresses.length; i++) {
+            whitelist[_addresses[i]] = true;
+
+        }
+  }
+  
+  function whitelistMint(uint amount) public payable
+  {
+    require(_tokenIdTracker.current() + amount <= 500, "CryptoWhales: not enough crypto whales left to mint amount");
+    require(whitelist[msg.sender] == true, "CryptoWhales: Not whitelisted");
+    require(msg.value == _price*amount, "CryptoWhales: must send correct price");
+
+    for(uint i=0; i < amount; i++){
+      _mint(msg.sender, _tokenIdTracker.current());
+       minter[_tokenIdTracker.current()] = msg.sender;
+      _tokenIdTracker.increment();
+    }
+  }
+
+  function initAdminMint(uint amount) public {
     require(msg.sender == _admin || msg.sender == _admin2, "CryptoWhales: Only admin can call");
-    require(_tokenIdTracker.current() + amount <= 2, "CryptoWhales: not enough crypto whales left to mint amount");
+    require(_tokenIdTracker.current() + amount <= 500, "CryptoWhales: not enough crypto whales left to mint amount");
 
     for(uint i=0; i < amount; i++){
       _mint(msg.sender, _tokenIdTracker.current());
