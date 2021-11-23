@@ -27,7 +27,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 
 /**
- * ULAN INIT MINT VE SHARE !
  * @dev {ERC721} token, including:
  *
  *  - ability for holders to burn (destroy) their tokens
