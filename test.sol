@@ -1,122 +1,102 @@
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// ▄████▄   ██▀███ ▓██   ██▓ ██▓███  ▄▄▄█████▓ ▒█████      █     █░ ██░ ██  ▄▄▄       ██▓    ▓█████   ██████ 
-// ▒██▀ ▀█  ▓██ ▒ ██▒▒██  ██▒▓██░  ██▒▓  ██▒ ▓▒▒██▒  ██▒   ▓█░ █ ░█░▓██░ ██▒▒████▄    ▓██▒    ▓█   ▀ ▒██    ▒ 
-// ▒▓█    ▄ ▓██ ░▄█ ▒ ▒██ ██░▓██░ ██▓▒▒ ▓██░ ▒░▒██░  ██▒   ▒█░ █ ░█ ▒██▀▀██░▒██  ▀█▄  ▒██░    ▒███   ░ ▓██▄   
-// ▒▓▓▄ ▄██▒▒██▀▀█▄   ░ ▐██▓░▒██▄█▓▒ ▒░ ▓██▓ ░ ▒██   ██░   ░█░ █ ░█ ░▓█ ░██ ░██▄▄▄▄██ ▒██░    ▒▓█  ▄   ▒   ██▒
-// ▒ ▓███▀ ░░██▓ ▒██▒ ░ ██▒▓░▒██▒ ░  ░  ▒██▒ ░ ░ ████▓▒░   ░░██▒██▓ ░▓█▒░██▓ ▓█   ▓██▒░██████▒░▒████▒▒██████▒▒
-// ░ ░▒ ▒  ░░ ▒▓ ░▒▓░  ██▒▒▒ ▒▓▒░ ░  ░  ▒ ░░   ░ ▒░▒░▒░    ░ ▓░▒ ▒   ▒ ░░▒░▒ ▒▒   ▓▒█░░ ▒░▓  ░░░ ▒░ ░▒ ▒▓▒ ▒ ░
-//   ░  ▒     ░▒ ░ ▒░▓██ ░▒░ ░▒ ░         ░      ░ ▒ ▒░      ▒ ░ ░   ▒ ░▒░ ░  ▒   ▒▒ ░░ ░ ▒  ░ ░ ░  ░░ ░▒  ░ ░
-// ░          ░░   ░ ▒ ▒ ░░  ░░         ░      ░ ░ ░ ▒       ░   ░   ░  ░░ ░  ░   ▒     ░ ░      ░   ░  ░  ░  
-// ░ ░         ░     ░ ░                           ░ ░         ░     ░  ░  ░      ░  ░    ░  ░   ░  ░      ░  
-// ░                 ░ ░                                                                                      
+import '@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
 
+contract CryptoWhales is ERC721Enumerable, Ownable {
 
+    using Strings for uint256;
 
+    string _baseTokenURI;
+    bool public _pausedPresale = true;
+    uint256 private _reserved = 10;
+    uint256 private _price = 0.05 ether;
+    uint256 public _maxSupply = 30;
+    uint256 public _presaleSupply = 19;
+    uint256 public _startDate = 1638974922;
+    // withdraw addresses
+    address wallet = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+    constructor(string memory baseURI) ERC721("Crypto Whales", "CW")  {
+        setBaseURI(baseURI);
 
-
-/**
- * @dev {ERC721} standart erc-721 token
- */
-
-contract CryptoWhales is Context,  Ownable, ERC721{
-  using Counters for Counters.Counter;
-  Counters.Counter public _tokenIdTracker;
-  string private _baseTokenURI;
-  uint256 private _price;
-  uint256 public _startDate;
-  uint private _max;
-  address private _admin;
-  mapping(address => bool) public whitelist;
-  mapping (uint256 => address ) public minter;
-
-  constructor(string memory name, string memory symbol, string memory baseTokenURI, uint256 mintPrice, uint256 startDate ,uint max, address admin) ERC721(name, symbol) {
-      _baseTokenURI = baseTokenURI;
-      _startDate = startDate;
-      _price = mintPrice;
-      _max = max;
-      _admin = admin;
-  }
-
-  function _baseURI() internal view virtual override returns (string memory) {
-      return _baseTokenURI;
-  }
-
-  function setBaseURI(string memory baseURI) external onlyOwner {
-    _baseTokenURI = baseURI;
-  }
-
-
-  function setPrice(uint mintPrice) external onlyOwner {
-    _price = mintPrice;
-  }
-
-  function price() public view returns (uint) {
-    return _price;
-  }
-
-  function mint(uint amount) public payable {
-    require(msg.value == _price*amount, "CryptoWhales: must send correct price");
-    require(_tokenIdTracker.current() + amount <= _max, "CryptoWhales: not enough crypto whales left to mint amount");
-    require(_startDate <= block.timestamp,"CryptoWhales: Sale is not active");
-    for(uint i=0; i < amount; i++){
-      _mint(msg.sender, _tokenIdTracker.current());
-      minter[_tokenIdTracker.current()] = msg.sender;
-      _tokenIdTracker.increment();
-      splitBalance(msg.value/amount);
-    }
-  }
-
-
-  function whitelistAddresses(address[] memory _addresses) public onlyOwner
-  {
-        for (uint i=0; i<_addresses.length; i++) {
-            whitelist[_addresses[i]] = true;
-
+        // team gets the first 4 cats
+        for(uint256 i; i < 5; i++){
+            _safeMint( wallet, i );
         }
-  }
-  
-  function whitelistMint(uint amount) public payable
-  {
-    require(_tokenIdTracker.current() + amount <= 500, "CryptoWhales: not enough crypto whales left to mint amount");
-    require(whitelist[msg.sender] == true, "CryptoWhales: Not whitelisted");
-    require(msg.value == _price*amount, "CryptoWhales: must send correct price");
-
-    for(uint i=0; i < amount; i++){
-      _mint(msg.sender, _tokenIdTracker.current());
-       minter[_tokenIdTracker.current()] = msg.sender;
-      _tokenIdTracker.increment();
-      splitBalance(msg.value/amount);
-
     }
-  }
 
-  function initAdminMint(uint amount) public onlyOwner {
-    require(_tokenIdTracker.current() + amount <= 8888, "CryptoWhales: not enough crypto whales left to mint amount");
+    function mint(uint256 num) public payable {
+        uint256 supply = totalSupply();
+        require( supply + num <= _maxSupply - _reserved,     "Exceeds maximum supply" );
+        require( msg.value >= _price * num,                 "Ether sent is not correct" );
+        require(_startDate <= block.timestamp,              "Sale is not active");
 
-    for(uint i=0; i < amount; i++){
-      _mint(msg.sender, _tokenIdTracker.current());
-      minter[_tokenIdTracker.current()] = msg.sender;
-      _tokenIdTracker.increment();
+        for(uint256 i; i < num; i++){
+            _safeMint( msg.sender, supply + i );
+        }
     }
-  }
 
-  function tokenMinter(uint256 tokenId) public view returns(address){
-    return minter[tokenId];
-  }
+    function pausePresale(bool val) public onlyOwner {
+        _pausedPresale = val;
+    }
 
+    function mintPresale(uint256 num) public payable {
+        uint256 supply = totalSupply();
+        require( !_pausedPresale,                            "Sale paused" );
+        require( supply + num <= _presaleSupply - _reserved,      "Exceeds maximum supply" );
+        require( msg.value >= _price * num,                  "Ether sent is not correct" );
 
-  function splitBalance(uint256 amount) private {
+        for(uint256 i; i < num; i++){
+            _safeMint( msg.sender, supply + i );
+        }
+    }
 
-      uint256 mintingShare  = amount;
-      payable(_admin).transfer(mintingShare);
-  }
+    function walletOfOwner(address _owner) public view returns(uint256[] memory) {
+        uint256 tokenCount = balanceOf(_owner);
 
+        uint256[] memory tokensId = new uint256[](tokenCount);
+        for(uint256 i; i < tokenCount; i++){
+            tokensId[i] = tokenOfOwnerByIndex(_owner, i);
+        }
+        return tokensId;
+    }
 
+    function setPrice(uint256 _newPrice) public onlyOwner() {
+        _price = _newPrice;
+    }
+
+    function setPresaleSupply(uint256 _newSupply) public onlyOwner() {
+        require( _newSupply <= _maxSupply,      "Exceeds maximum supply" );
+        _presaleSupply = _newSupply;
+    }
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    function setBaseURI(string memory baseURI) public onlyOwner {
+        _baseTokenURI = baseURI;
+    }
+
+    function getPrice() public view returns (uint256){
+        return _price;
+    }
+
+    function giveAwayNft(address _to, uint256 _amount) external onlyOwner() {
+        require( _amount <= _reserved, "Exceeds reserved Cat supply" );
+
+        uint256 supply = totalSupply();
+        for(uint256 i; i < _amount; i++){
+            _safeMint( _to, supply + i );
+        }
+
+        _reserved -= _amount;
+    }
+
+    function withdrawAll() public payable onlyOwner {
+        uint256 _each = address(this).balance / 1;
+        require(payable(wallet).send(_each));
+    }
 }
