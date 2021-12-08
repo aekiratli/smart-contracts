@@ -45,7 +45,7 @@ contract CryptoWhales is ERC721Enumerable, Ownable {
     function mintPresale(uint256 num) public payable {
         uint256 supply = totalSupply();
         require( !_pausedPresale,                            "Sale paused" );
-        require( supply + num <= _presaleSupply - _reserved,      "Exceeds maximum supply" );
+        require( supply + num <= _presaleSupply,      "Exceeds maximum supply" );
         require( msg.value >= _price * num,                  "Ether sent is not correct" );
 
         for(uint256 i; i < num; i++){
