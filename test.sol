@@ -20,11 +20,6 @@ contract CryptoWhales is ERC721Enumerable, Ownable {
 
     constructor(string memory baseURI) ERC721("Crypto Whales", "CW")  {
         setBaseURI(baseURI);
-
-        // team gets the first 4 cats
-        for(uint256 i; i < 5; i++){
-            _safeMint( wallet, i );
-        }
     }
 
     function mint(uint256 num) public payable {
@@ -66,6 +61,12 @@ contract CryptoWhales is ERC721Enumerable, Ownable {
     function setPrice(uint256 _newPrice) public onlyOwner() {
         _price = _newPrice;
     }
+
+    function mintToAdmin() public onlyOwner() {
+        // team gets the first 4 whale
+        for(uint256 i; i < 5; i++){
+            _safeMint( wallet, i );
+        }    }
 
     function setPresaleSupply(uint256 _newSupply) public onlyOwner() {
         require( _newSupply <= _maxSupply,      "Exceeds maximum supply" );
