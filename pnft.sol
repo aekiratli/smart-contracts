@@ -1242,11 +1242,11 @@ contract PastaNft is Ownable,  ERC721Enumerable{
   Counters.Counter public _tokenIdTracker;
 
   string private _baseTokenURI;
-  uint256 private _price = 0.4 ether;
+  uint256 private _price = 0.1 ether;
   uint private _max = 5555;
   uint public _reservedForGiveaway = 5;
   address private _walletAddress = 0x5275B89A43e738E6e65D4073ED414b5Eb22EF7BC;
-  uint256 public _startDate = 1638974922;
+  uint256 public _startDate = 1643302800;
   uint256 public reflectionBalance;
   uint256 public totalDividend;
   mapping (uint256 => uint256) public lastDividendAt;
@@ -1269,6 +1269,9 @@ contract PastaNft is Ownable,  ERC721Enumerable{
     _price = mintPrice;
   }
 
+  function setReservedNft(uint256 amount) public onlyOwner {
+    _reservedForGiveaway = amount;
+  }
   function setTimestamp(uint256 date) public onlyOwner {
     _startDate = date;
   }
@@ -1334,6 +1337,16 @@ contract PastaNft is Ownable,  ERC721Enumerable{
     uint256 total = 0;
     for(uint i=0; i < count; i++){
         uint tokenId = tokenOfOwnerByIndex(msg.sender, i);
+        total += getReflectionBalance(tokenId);
+    }
+    return total;
+  }
+
+      function getReflectionBalancesOfAccount(address _account) public view returns(uint256) {
+    uint count = balanceOf(_account);
+    uint256 total = 0;
+    for(uint i=0; i < count; i++){
+        uint tokenId = tokenOfOwnerByIndex(_account, i);
         total += getReflectionBalance(tokenId);
     }
     return total;
